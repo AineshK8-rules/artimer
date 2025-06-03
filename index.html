@@ -89,6 +89,7 @@
     const increment = 60;
 
     let dragging = false;
+    let rawSeconds = 0;
     let selectedSeconds = 0;
     let dialAdjusted = false;
     let isRunning = false;
@@ -158,10 +159,7 @@
         ctx.stroke();
       }
 
-      let knobAngle = -Math.PI / 2 + (selectedSeconds / maxSeconds) * 2 * Math.PI;
-      if (selectedSeconds >= maxSeconds) {
-        knobAngle = -Math.PI / 2 + 2 * Math.PI;
-      }
+      const knobAngle = -Math.PI / 2 + (selectedSeconds / maxSeconds) * 2 * Math.PI;
       const knobX = center.x + radius * Math.cos(knobAngle);
       const knobY = center.y + radius * Math.sin(knobAngle);
       ctx.beginPath();
@@ -178,27 +176,24 @@
       ctx.restore();
     }
 
-    function updateFromMouse(x, y) {
-      if (isRunning) return;
-      if (pulsing) {
-        cancelAnimationFrame(pulseFrame);
-        pulsing = false;
-        drawDial();
-      }
-
+    function updateDialFromMouse(x, y) {
       const dx = x - center.x;
       const dy = y - center.y;
       const angle = Math.atan2(dy, dx) + Math.PI / 2;
       const normalized = (angle + 2 * Math.PI) % (2 * Math.PI);
-      let rawSeconds = (normalized / (2 * Math.PI)) * maxSeconds;
-      selectedSeconds = Math.round(rawSeconds / increment) * increment;
-      selectedSeconds = Math.min(Math.max(selectedSeconds, 0), maxSeconds);
+      rawSeconds = (normalized / (2 * Math.PI)) * maxSeconds;
+      selectedSeconds = rawSeconds;
       drawDial();
-
       if (!dialAdjusted && selectedSeconds > 0) {
         dialAdjusted = true;
         player.classList.add("active");
       }
+    }
+
+    function snapToIncrement() {
+      selectedSeconds = Math.round(rawSeconds / increment) * increment;
+      selectedSeconds = Math.min(Math.max(selectedSeconds, 0), maxSeconds);
+      drawDial();
     }
 
     function pulse() {
@@ -221,14 +216,10 @@
       pulsing = true;
       pulse();
 
-      // ⚠️ SEND MESSAGE TO WIX VIA postMessage
-      window.parent.postMessage(
-        {
-          type: "TIMER_COMPLETE",
-          action: "STOP_PLAYERS"
-        },
-        "*"
-      );
+      window.parent.postMessage({
+        type: "TIMER_COMPLETE",
+        action: "STOP_PLAYERS"
+      }, "*");
 
       setTimeout(() => alert("Time's up!"), 600);
     }
@@ -264,17 +255,24 @@
       if (isRunning) return;
       const rect = canvas.getBoundingClientRect();
       dragging = true;
-      updateFromMouse(e.clientX - rect.left, e.clientY - rect.top);
+      updateDialFromMouse(e.clientX - rect.left, e.clientY - rect.top);
     });
 
     canvas.addEventListener("mousemove", (e) => {
-      if (isRunning || !dragging) return;
+      if (!dragging || isRunning) return;
       const rect = canvas.getBoundingClientRect();
-      updateFromMouse(e.clientX - rect.left, e.clientY - rect.top);
+      updateDialFromMouse(e.clientX - rect.left, e.clientY - rect.top);
     });
 
-    canvas.addEventListener("mouseup", () => { dragging = false; });
-    canvas.addEventListener("mouseleave", () => { dragging = false; });
+    canvas.addEventListener("mouseup", () => {
+      if (dragging) snapToIncrement();
+      dragging = false;
+    });
+
+    canvas.addEventListener("mouseleave", () => {
+      if (dragging) snapToIncrement();
+      dragging = false;
+    });
 
     player.addEventListener("click", () => {
       if (!dialAdjusted && selectedSeconds === 0) return;
