@@ -1,215 +1,49 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="UTF-8">
+  <title>AR Timer</title>
   <style>
-    :root {
-      --circle-bg: #f8924f;
-    }
-
     body {
       margin: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: "Emirates Medium", sans-serif;
-      background: transparent; /* ✅ This line removes the black background */
-    }
-
-    .container {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    canvas {
-      width: 110px;
-      height: 110px;
-      cursor: pointer;
-      touch-action: none;
-    }
-
-    .fake-player {
-      width: 60px;
-      height: 60px;
-      border-radius: 50%;
-      background: var(--circle-bg);
-      border: none;
-      cursor: pointer;
-      user-select: none;
-      opacity: 0.3;
-      transition: opacity 0.3s ease;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-
-    .fake-player.active {
-      opacity: 1;
-    }
-
-    .play-btn,
-    .pause-btn {
-      font-size: 28px;
+      background: #111;
       color: white;
-      background: none;
-      border: none;
-      outline: none;
-      user-select: none;
-      line-height: 1;
+      font-family: 'Segoe UI', sans-serif;
     }
-
-    .hidden {
-      display: none;
+    .timer {
+      font-size: 48px;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <button class="fake-player" id="player">
-      <span class="play-btn">▶</span>
-      <span class="pause-btn hidden">⏸</span>
-    </button>
-    <canvas id="dialCanvas" width="110" height="110"></canvas>
-  </div>
+  <div class="timer" id="timer">00:10</div>
 
-  <audio id="alarm" preload="auto">
-    <source src="timer.mp3" type="audio/mpeg" />
-    Your browser does not support the audio element.
-  </audio>
+  <audio id="alarm" src="https://www.soundjay.com/button/beep-07.wav" preload="auto"></audio>
 
   <script>
-    const canvas = document.getElementById("dialCanvas");
-    const ctx = canvas.getContext("2d");
-    const center = { x: canvas.width / 2, y: canvas.height / 2 };
-    const radius = 40;
-    const maxSeconds = 3600;
-    const increment = 60;
+    let duration = 10; // seconds
+    let timerDisplay = document.getElementById("timer");
+    let alarm = document.getElementById("alarm");
+    let interval;
 
-    let dragging = false;
-    let selectedSeconds = 0;
-    let dialAdjusted = false;
-    let isRunning = false;
-    let timerInterval = null;
+    function startTimer() {
+      let timeLeft = duration;
+      interval = setInterval(() => {
+        let mins = Math.floor(timeLeft / 60).toString().padStart(2, '0');
+        let secs = (timeLeft % 60).toString().padStart(2, '0');
+        timerDisplay.textContent = `${mins}:${secs}`;
 
-    let pulsing = false;
-    let pulseScale = 1;
-    let pulseDirection = 1;
-    let pulseFrame;
+        if (timeLeft <= 0) {
+          clearInterval(interval);
+          playAlarm();
+        }
 
-    const player = document.getElementById("player");
-    const playBtn = player.querySelector(".play-btn");
-    const pauseBtn = player.querySelector(".pause-btn");
-    const alarm = document.getElementById("alarm");
-
-    let audioUnlocked = false;
-    document.addEventListener("click", () => {
-      if (!audioUnlocked) {
-        alarm.load();
-        alarm.play().then(() => {
-          alarm.pause();
-          alarm.currentTime = 0;
-          audioUnlocked = true;
-        }).catch(() => {
-          console.warn("User interaction required to play audio.");
-        });
-      }
-    }, { once: true });
-
-    function secondsToTimeString(seconds) {
-      const m = Math.floor(seconds / 60);
-      const s = seconds % 60;
-      return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-    }
-
-    function drawDial(glow = false, scale = 1) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.save();
-      ctx.translate(center.x, center.y);
-      ctx.scale(scale, scale);
-      ctx.translate(-center.x, -center.y);
-
-      if (glow) {
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = "#ffffff";
-      } else {
-        ctx.shadowBlur = 0;
-      }
-
-      ctx.beginPath();
-      ctx.arc(center.x, center.y, radius + 6, 0, Math.PI * 2);
-      ctx.fillStyle = "#1a1a1a";
-      ctx.fill();
-
-      ctx.beginPath();
-      ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
-      ctx.strokeStyle = "#333";
-      ctx.lineWidth = 10;
-      ctx.stroke();
-
-      if (selectedSeconds > 0) {
-        const endAngle = -Math.PI / 2 + (selectedSeconds / maxSeconds) * 2 * Math.PI;
-        ctx.beginPath();
-        ctx.arc(center.x, center.y, radius, -Math.PI / 2, endAngle);
-        ctx.strokeStyle = "#f8924f";
-        ctx.lineWidth = 10;
-        ctx.stroke();
-      }
-
-      let knobAngle = -Math.PI / 2 + (selectedSeconds / maxSeconds) * 2 * Math.PI;
-      if (selectedSeconds >= maxSeconds) {
-        knobAngle = -Math.PI / 2 + 2 * Math.PI;
-      }
-      const knobX = center.x + radius * Math.cos(knobAngle);
-      const knobY = center.y + radius * Math.sin(knobAngle);
-      ctx.beginPath();
-      ctx.arc(knobX, knobY, 6, 0, Math.PI * 2);
-      ctx.fillStyle = "#f8924f";
-      ctx.fill();
-
-      ctx.font = "bold 20px Emirates Medium";
-      ctx.fillStyle = "#ffffff";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(secondsToTimeString(Math.round(selectedSeconds)), center.x, center.y);
-
-      ctx.restore();
-    }
-
-    function updateFromMouse(x, y) {
-      if (isRunning) return;
-
-      // STOP PULSING IF USER ADJUSTS TIMER
-      if (pulsing) {
-    cancelAnimationFrame(pulseFrame);
-    pulsing = false;
-    drawDial(); // Redraw without glow
-      }
-
-      const dx = x - center.x;
-      const dy = y - center.y;
-      const angle = Math.atan2(dy, dx) + Math.PI / 2;
-      const normalized = (angle + 2 * Math.PI) % (2 * Math.PI);
-      let rawSeconds = (normalized / (2 * Math.PI)) * maxSeconds;
-      selectedSeconds = Math.round(rawSeconds / increment) * increment;
-      selectedSeconds = Math.min(Math.max(selectedSeconds, 0), maxSeconds);
-      drawDial();
-      if (!dialAdjusted && selectedSeconds > 0) {
-    dialAdjusted = true;
-    player.classList.add("active");
-      }
-}
-
-    function pulse() {
-      if (!pulsing) return;
-      pulseScale += 0.01 * pulseDirection;
-      if (pulseScale > 1.1 || pulseScale < 0.9) {
-        pulseDirection *= -1;
-      }
-      drawDial(true, pulseScale);
-      pulseFrame = requestAnimationFrame(pulse);
+        timeLeft--;
+      }, 1000);
     }
 
     async function playAlarm() {
@@ -217,71 +51,15 @@
         alarm.pause();
         alarm.currentTime = 0;
         await alarm.play();
-      } catch (error) {
-        console.warn("Alarm couldn't play:", error);
+      } catch (e) {
+        console.warn("Alarm play failed:", e);
       }
 
-      pulsing = true;
-      pulse();
-      setTimeout(() => alert("Time's up!"), 600);
+      // Send message to parent (Wix)
+      window.parent.postMessage({ type: "TIMER_DONE" }, "*");
     }
 
-    function startTimer() {
-      if (timerInterval) clearInterval(timerInterval);
-      timerInterval = setInterval(() => {
-        if (selectedSeconds > 0) {
-          selectedSeconds = Math.max(selectedSeconds - 1, 0);
-          drawDial();
-        } else {
-          pauseTimer();
-          playAlarm();
-        }
-      }, 1000);
-    }
-
-    function pauseTimer() {
-      clearInterval(timerInterval);
-      timerInterval = null;
-      isRunning = false;
-      playBtn.classList.remove("hidden");
-      pauseBtn.classList.add("hidden");
-
-      if (pulsing) {
-        cancelAnimationFrame(pulseFrame);
-        pulsing = false;
-        drawDial();
-      }
-    }
-
-    canvas.addEventListener("mousedown", (e) => {
-      if (isRunning) return;
-      const rect = canvas.getBoundingClientRect();
-      dragging = true;
-      updateFromMouse(e.clientX - rect.left, e.clientY - rect.top);
-    });
-
-    canvas.addEventListener("mousemove", (e) => {
-      if (isRunning || !dragging) return;
-      const rect = canvas.getBoundingClientRect();
-      updateFromMouse(e.clientX - rect.left, e.clientY - rect.top);
-    });
-
-    canvas.addEventListener("mouseup", () => { dragging = false; });
-    canvas.addEventListener("mouseleave", () => { dragging = false; });
-
-    player.addEventListener("click", () => {
-      if (!dialAdjusted && selectedSeconds === 0) return;
-      if (isRunning) {
-        pauseTimer();
-      } else {
-        isRunning = true;
-        playBtn.classList.add("hidden");
-        pauseBtn.classList.remove("hidden");
-        startTimer();
-      }
-    });
-
-    drawDial();
+    startTimer();
   </script>
 </body>
 </html>
