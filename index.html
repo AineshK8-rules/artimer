@@ -176,7 +176,10 @@
       ctx.restore();
     }
 
-    function updateDialFromMouse(x, y) {
+    function updateDialFromPointer(e) {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
       const dx = x - center.x;
       const dy = y - center.y;
       const angle = Math.atan2(dy, dx) + Math.PI / 2;
@@ -251,25 +254,23 @@
       }
     }
 
-    canvas.addEventListener("mousedown", (e) => {
+    canvas.addEventListener("pointerdown", (e) => {
       if (isRunning) return;
-      const rect = canvas.getBoundingClientRect();
       dragging = true;
-      updateDialFromMouse(e.clientX - rect.left, e.clientY - rect.top);
+      updateDialFromPointer(e);
     });
 
-    canvas.addEventListener("mousemove", (e) => {
+    canvas.addEventListener("pointermove", (e) => {
       if (!dragging || isRunning) return;
-      const rect = canvas.getBoundingClientRect();
-      updateDialFromMouse(e.clientX - rect.left, e.clientY - rect.top);
+      updateDialFromPointer(e);
     });
 
-    canvas.addEventListener("mouseup", () => {
+    canvas.addEventListener("pointerup", () => {
       if (dragging) snapToIncrement();
       dragging = false;
     });
 
-    canvas.addEventListener("mouseleave", () => {
+    canvas.addEventListener("pointerleave", () => {
       if (dragging) snapToIncrement();
       dragging = false;
     });
