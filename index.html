@@ -139,17 +139,20 @@
         ctx.shadowBlur = 0;
       }
 
+      // Outer filled ring
       ctx.beginPath();
       ctx.arc(center.x, center.y, radius + 6, 0, Math.PI * 2);
       ctx.fillStyle = "#1a1a1a";
       ctx.fill();
 
+      // Inner ring
       ctx.beginPath();
       ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
       ctx.strokeStyle = "#333";
       ctx.lineWidth = 10;
       ctx.stroke();
 
+      // Arc showing time
       if (selectedSeconds > 0) {
         const endAngle = -Math.PI / 2 + (selectedSeconds / maxSeconds) * 2 * Math.PI;
         ctx.beginPath();
@@ -159,6 +162,7 @@
         ctx.stroke();
       }
 
+      // Knob
       const knobAngle = -Math.PI / 2 + (selectedSeconds / maxSeconds) * 2 * Math.PI;
       const knobX = center.x + radius * Math.cos(knobAngle);
       const knobY = center.y + radius * Math.sin(knobAngle);
@@ -167,11 +171,21 @@
       ctx.fillStyle = "#f8924f";
       ctx.fill();
 
+      // Time text
       ctx.font = "bold 20px Emirates Medium";
       ctx.fillStyle = "#ffffff";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(secondsToTimeString(Math.round(selectedSeconds)), center.x, center.y);
+
+      // 60-minute mark indicator (top)
+      const fullAngle = -Math.PI / 2;
+      const markX = center.x + radius * Math.cos(fullAngle);
+      const markY = center.y + radius * Math.sin(fullAngle);
+      ctx.beginPath();
+      ctx.arc(markX, markY, 4, 0, 2 * Math.PI);
+      ctx.fillStyle = "#ffffff";
+      ctx.fill();
 
       ctx.restore();
     }
@@ -185,6 +199,12 @@
       const angle = Math.atan2(dy, dx) + Math.PI / 2;
       const normalized = (angle + 2 * Math.PI) % (2 * Math.PI);
       rawSeconds = (normalized / (2 * Math.PI)) * maxSeconds;
+
+      // Snap to 60 min if near top
+      if (rawSeconds >= 3540) {
+        rawSeconds = maxSeconds;
+      }
+
       selectedSeconds = rawSeconds;
       drawDial();
       if (!dialAdjusted && selectedSeconds > 0) {
