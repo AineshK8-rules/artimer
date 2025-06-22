@@ -2,113 +2,103 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Responsive Timer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root {
-      --accent-color: #f8924f;
-      --dark-bg: #121212;
-      --dial-bg: #1e1e1e;
-      --text-color: #ffffff;
+      --circle-bg: #f8924f;
     }
 
     body {
       margin: 0;
       height: 100vh;
       display: flex;
-      justify-content: center;
       align-items: center;
-      background: var(--dark-bg);
-      font-family: "Segoe UI", "Emirates Medium", sans-serif;
-      color: var(--text-color);
+      justify-content: center;
+      font-family: "Emirates Medium", sans-serif;
+      background: transparent;
     }
 
     .container {
       display: flex;
       align-items: center;
-      gap: 16px;
-      flex-direction: column;
+      gap: 8px;
     }
 
     canvas {
-      width: 250px;
-      height: 250px;
-      max-width: 90vw;
-      max-height: 90vw;
+      width: 110px;
+      height: 110px;
+      cursor: pointer;
       touch-action: none;
     }
 
     .fake-player {
-      width: 70px;
-      height: 70px;
+      width: 60px;
+      height: 60px;
       border-radius: 50%;
-      background: var(--accent-color);
+      background: var(--circle-bg);
       border: none;
       cursor: pointer;
+      user-select: none;
+      opacity: 0.3;
+      transition: opacity 0.3s ease;
       display: flex;
       justify-content: center;
       align-items: center;
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-      transition: transform 0.2s ease, opacity 0.3s ease;
-      opacity: 0.4;
     }
 
     .fake-player.active {
       opacity: 1;
     }
 
-    .fake-player:active {
-      transform: scale(0.95);
-    }
-
-    .play-btn, .pause-btn {
-      font-size: 30px;
+    .play-btn,
+    .pause-btn {
+      font-size: 28px;
       color: white;
-      pointer-events: none;
+      background: none;
+      border: none;
+      outline: none;
       user-select: none;
+      line-height: 1;
     }
 
     .hidden {
       display: none;
     }
-
-    @media (min-width: 600px) {
-      .container {
-        flex-direction: row;
-        gap: 24px;
-      }
-
-      canvas {
-        width: 220px;
-        height: 220px;
-      }
-    }
   </style>
 </head>
 <body>
   <div class="container">
-    <canvas id="dialCanvas" width="300" height="300"></canvas>
     <button class="fake-player" id="player">
       <span class="play-btn">▶</span>
       <span class="pause-btn hidden">⏸</span>
     </button>
+    <canvas id="dialCanvas" width="110" height="110"></canvas>
   </div>
 
   <audio id="alarm" preload="auto">
     <source src="timer.mp3" type="audio/mpeg" />
+    Your browser does not support the audio element.
   </audio>
 
   <script>
     const canvas = document.getElementById("dialCanvas");
     const ctx = canvas.getContext("2d");
     const center = { x: canvas.width / 2, y: canvas.height / 2 };
-    const radius = 80;
+    const radius = 40;
     const maxSeconds = 3600;
     const increment = 60;
 
-    let dragging = false, rawSeconds = 0, selectedSeconds = 0;
-    let dialAdjusted = false, isRunning = false, timerInterval = null;
-    let pulsing = false, pulseScale = 1, pulseDirection = 1, pulseFrame;
+    let dragging = false;
+    let rawSeconds = 0;
+    let selectedSeconds = 0;
+    let dialAdjusted = false;
+    let isRunning = false;
+    let timerInterval = null;
+
+    let pulsing = false;
+    let pulseScale = 1;
+    let pulseDirection = 1;
+    let pulseFrame;
 
     const player = document.getElementById("player");
     const playBtn = player.querySelector(".play-btn");
@@ -118,10 +108,14 @@
     let audioUnlocked = false;
     document.addEventListener("click", () => {
       if (!audioUnlocked) {
+        alarm.load();
         alarm.play().then(() => {
-          alarm.pause(); alarm.currentTime = 0;
+          alarm.pause();
+          alarm.currentTime = 0;
           audioUnlocked = true;
-        }).catch(() => {});
+        }).catch(() => {
+          console.warn("User interaction required to play audio.");
+        });
       }
     }, { once: true });
 
@@ -139,48 +133,59 @@
       ctx.translate(-center.x, -center.y);
 
       if (glow) {
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = "#fff";
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = "#ffffff";
+      } else {
+        ctx.shadowBlur = 0;
       }
 
-      // Outer ring background
+      // Outer filled ring
       ctx.beginPath();
-      ctx.arc(center.x, center.y, radius + 12, 0, 2 * Math.PI);
-      ctx.fillStyle = "#2b2b2b";
+      ctx.arc(center.x, center.y, radius + 6, 0, Math.PI * 2);
+      ctx.fillStyle = "#1a1a1a";
       ctx.fill();
 
-      // Base track
+      // Inner ring
       ctx.beginPath();
-      ctx.arc(center.x, center.y, radius, 0, 2 * Math.PI);
-      ctx.strokeStyle = "#444";
-      ctx.lineWidth = 14;
+      ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+      ctx.strokeStyle = "#333";
+      ctx.lineWidth = 10;
       ctx.stroke();
 
-      // Progress arc
+      // Arc showing time
       if (selectedSeconds > 0) {
-        const end = -Math.PI / 2 + (selectedSeconds / maxSeconds) * 2 * Math.PI;
+        const endAngle = -Math.PI / 2 + (selectedSeconds / maxSeconds) * 2 * Math.PI;
         ctx.beginPath();
-        ctx.arc(center.x, center.y, radius, -Math.PI / 2, end);
+        ctx.arc(center.x, center.y, radius, -Math.PI / 2, endAngle);
         ctx.strokeStyle = "#f8924f";
-        ctx.lineWidth = 14;
+        ctx.lineWidth = 10;
         ctx.stroke();
       }
 
       // Knob
-      const angle = -Math.PI / 2 + (selectedSeconds / maxSeconds) * 2 * Math.PI;
-      const knobX = center.x + radius * Math.cos(angle);
-      const knobY = center.y + radius * Math.sin(angle);
+      const knobAngle = -Math.PI / 2 + (selectedSeconds / maxSeconds) * 2 * Math.PI;
+      const knobX = center.x + radius * Math.cos(knobAngle);
+      const knobY = center.y + radius * Math.sin(knobAngle);
       ctx.beginPath();
-      ctx.arc(knobX, knobY, 7, 0, 2 * Math.PI);
+      ctx.arc(knobX, knobY, 6, 0, Math.PI * 2);
       ctx.fillStyle = "#f8924f";
       ctx.fill();
 
       // Time text
-      ctx.font = "bold 24px Segoe UI";
+      ctx.font = "bold 20px Emirates Medium";
       ctx.fillStyle = "#ffffff";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(secondsToTimeString(Math.round(selectedSeconds)), center.x, center.y);
+
+      // 60-minute mark indicator (top)
+      const fullAngle = -Math.PI / 2;
+      const markX = center.x + radius * Math.cos(fullAngle);
+      const markY = center.y + radius * Math.sin(fullAngle);
+      ctx.beginPath();
+      ctx.arc(markX, markY, 4, 0, 2 * Math.PI);
+      ctx.fillStyle = "#ffffff";
+      ctx.fill();
 
       ctx.restore();
     }
@@ -195,7 +200,10 @@
       const normalized = (angle + 2 * Math.PI) % (2 * Math.PI);
       rawSeconds = (normalized / (2 * Math.PI)) * maxSeconds;
 
-      if (rawSeconds >= 3540) rawSeconds = maxSeconds;
+      // Snap to 60 min if near top
+      if (rawSeconds >= 3540) {
+        rawSeconds = maxSeconds;
+      }
 
       selectedSeconds = rawSeconds;
       drawDial();
@@ -221,12 +229,22 @@
 
     async function playAlarm() {
       try {
-        alarm.pause(); alarm.currentTime = 0;
+        alarm.pause();
+        alarm.currentTime = 0;
         await alarm.play();
-      } catch (error) {}
+      } catch (error) {
+        console.warn("Alarm couldn't play:", error);
+      }
+
       pulsing = true;
       pulse();
-      setTimeout(() => alert("⏰ Time's up!"), 600);
+
+      window.parent.postMessage({
+        type: "TIMER_COMPLETE",
+        action: "STOP_PLAYERS"
+      }, "*");
+
+      setTimeout(() => alert("Time's up!"), 600);
     }
 
     function startTimer() {
@@ -248,6 +266,7 @@
       isRunning = false;
       playBtn.classList.remove("hidden");
       pauseBtn.classList.add("hidden");
+
       if (pulsing) {
         cancelAnimationFrame(pulseFrame);
         pulsing = false;
